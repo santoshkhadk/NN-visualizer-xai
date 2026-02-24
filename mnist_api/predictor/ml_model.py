@@ -30,29 +30,28 @@ def predict(x):   # 👈 THIS MUST EXIST
     z2 = a1 @ W2 + b2
     probs = softmax(z2)
     pred_index = int(np.argmax(probs))
-    one_hot = np.zeros(10)
-    one_hot[pred_index] = 1
-    return one_hot
+              # extract scalar
+    return pred_index
 
 
-from PIL import Image
+# from PIL import Image
 
 
-# Load your image
-img = Image.open("/mnt/data/e360ea10-1991-4acf-9d5f-9c3dc81600fb.png").convert("L")  # grayscale
-img = img.resize((28, 28))  # MNIST size
+# # Load your image
+# img = Image.open("/mnt/data/e360ea10-1991-4acf-9d5f-9c3dc81600fb.png").convert("L")  # grayscale
+# img = img.resize((28, 28))  # MNIST size
 
-# Convert to NumPy array
-img_array = np.array(img)
+# # Convert to NumPy array
+# img_array = np.array(img)
 
-# Invert if needed (MNIST is white digit on black)
-img_array = 255 - img_array
+# # Invert if needed (MNIST is white digit on black)
+# img_array = 255 - img_array
 
-# Flatten
-img_flat = img_array.reshape(1, 784)
+# # Flatten
+# img_flat = img_array.reshape(1, 784)
 
-# Predict
-one_hot_pred = predict(img_flat)  # your function
-pred_index = int(np.argmax(one_hot_pred))
+# # Predict
+# one_hot_pred = predict(img_flat)  # your function
+# pred_index = int(np.argmax(one_hot_pred))
 
-print("Predicted digit:", pred_index)
+# print("Predicted digit:", pred_index)
