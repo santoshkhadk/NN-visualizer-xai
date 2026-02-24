@@ -4,15 +4,24 @@ export default function App() {
   const canvasRef = useRef(null);
   const [drawing, setDrawing] = useState(false);
   const [prediction, setPrediction] = useState(null);
+  const [lastPos, setLastPos] = useState({ x: 0, y: 0 });
 
-  // fill black background once
+  // Initialize black background
   useEffect(() => {
     const ctx = canvasRef.current.getContext("2d");
     ctx.fillStyle = "black";
     ctx.fillRect(0, 0, 280, 280);
   }, []);
 
-  const start = () => setDrawing(true);
+  const start = (e) => {
+    setDrawing(true);
+    const rect = canvasRef.current.getBoundingClientRect();
+    setLastPos({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    });
+  };
+
   const stop = () => setDrawing(false);
 
   const draw = (e) => {
@@ -22,10 +31,16 @@ export default function App() {
     const y = e.clientY - rect.top;
 
     const ctx = canvasRef.current.getContext("2d");
-    ctx.fillStyle = "white";
+    ctx.strokeStyle = "white";
+    ctx.lineWidth = 16; // Thicker strokes for MNIST
+    ctx.lineCap = "round";
+
     ctx.beginPath();
-    ctx.arc(x, y, 8, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.moveTo(lastPos.x, lastPos.y);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+
+    setLastPos({ x, y });
   };
 
   const clear = () => {
@@ -35,25 +50,64 @@ export default function App() {
     setPrediction(null);
   };
 
-  // convert canvas → 784 pixels
+  // Convert canvas → 28x28 normalized pixels
   const getPixels = () => {
-    const small = document.createElement("canvas");
-    small.width = 28;
-    small.height = 28;
+  const canvas = canvasRef.current;
+  const ctx = canvas.getContext("2d");
 
-    const ctx = small.getContext("2d");
-    ctx.drawImage(canvasRef.current, 0, 0, 28, 28);
+  // 1️⃣ Downscale to 28x28 first
+  const smallCanvas = document.createElement("canvas");
+  smallCanvas.width = 28;
+  smallCanvas.height = 28;
+  const smallCtx = smallCanvas.getContext("2d");
 
-    const data = ctx.getImageData(0, 0, 28, 28).data;
+  // Draw original canvas into 28x28
+  smallCtx.drawImage(canvas, 0, 0, 28, 28);
 
-    const pixels = [];
-    for (let i = 0; i < data.length; i += 4) {
-      pixels.push(data[i]); // grayscale
+  // 2️⃣ Get image data
+  let data = smallCtx.getImageData(0, 0, 28, 28).data;
+
+  // 3️⃣ Convert to grayscale and invert
+  let pixels = [];
+  for (let i = 0; i < data.length; i += 4) {
+    let gray = data[i]; // R channel
+    let normalized = 1 - gray / 255; // invert: white=1, black=0
+    pixels.push(normalized);
+  }
+
+  // 4️⃣ Center the digit
+  // Find bounding box of non-zero pixels
+  let top = 28, left = 28, bottom = 0, right = 0;
+  for (let y = 0; y < 28; y++) {
+    for (let x = 0; x < 28; x++) {
+      if (pixels[y * 28 + x] > 0) {
+        if (x < left) left = x;
+        if (x > right) right = x;
+        if (y < top) top = y;
+        if (y > bottom) bottom = y;
+      }
     }
-    return pixels;
-  };
+  }
 
-  const predict = async () => {
+  const digitWidth = right - left + 1;
+  const digitHeight = bottom - top + 1;
+
+  const centeredPixels = new Array(28 * 28).fill(0);
+
+  const offsetX = Math.floor((28 - digitWidth) / 2);
+  const offsetY = Math.floor((28 - digitHeight) / 2);
+
+  for (let y = top; y <= bottom; y++) {
+    for (let x = left; x <= right; x++) {
+      const srcIndex = y * 28 + x;
+      const dstIndex = (y - top + offsetY) * 28 + (x - left + offsetX);
+      centeredPixels[dstIndex] = pixels[srcIndex];
+    }
+  }
+
+  return centeredPixels; // 784 MNIST-style pixels, centered
+};
+  const predictDigit = async () => {
     const pixels = getPixels();
 
     const res = await fetch("http://127.0.0.1:8000/api/predict/", {
@@ -81,7 +135,7 @@ export default function App() {
       />
 
       <div style={{ marginTop: 20 }}>
-        <button onClick={predict}>Predict</button>
+        <button onClick={predictDigit}>Predict</button>
         <button onClick={clear} style={{ marginLeft: 10 }}>
           Clear
         </button>
