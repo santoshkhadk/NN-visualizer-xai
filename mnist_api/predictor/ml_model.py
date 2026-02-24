@@ -1,0 +1,33 @@
+import numpy as np
+import os
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+model_path = os.path.join(BASE_DIR, "mnist_xai_2500.npz")
+data = np.load(model_path)
+
+W1 = data["W1"]
+b1 = data["b1"]
+W2 = data["W2"]
+b2 = data["b2"]
+
+
+def relu(x):
+    return np.maximum(0, x)
+
+
+def softmax(x):
+    e = np.exp(x - np.max(x, axis=1, keepdims=True))
+    return e / np.sum(e, axis=1, keepdims=True)
+
+
+def predict(x):   # 👈 THIS MUST EXIST
+    x = x / 255.0
+
+    z1 = x @ W1 + b1
+    a1 = relu(z1)
+
+    z2 = a1 @ W2 + b2
+    probs = softmax(z2)
+
+    return int(np.argmax(probs))
