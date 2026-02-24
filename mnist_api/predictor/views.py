@@ -4,18 +4,20 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from .ml_model import predict
 
-
 @csrf_exempt
 def predict_digit(request):
     if request.method == "POST":
         try:
             body = json.loads(request.body)
-            pixels = np.array(body["pixels"]).reshape(1, -1)
+            pixels = np.array(body["pixels"]).reshape(1, -1)  # (1, 784)
 
-            result = predict(pixels)
+            # Get one-hot prediction
+            result = predict(pixels).tolist() 
+            pred_index = int(np.argmax(result)) # ✅ Convert to Python list
+             # Convert to list for JSON
 
             return JsonResponse({
-                "prediction": result
+                "prediction": pred_index
             })
 
         except Exception as e:

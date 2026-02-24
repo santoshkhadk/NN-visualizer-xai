@@ -29,5 +29,8 @@ def predict(x):   # 👈 THIS MUST EXIST
 
     z2 = a1 @ W2 + b2
     probs = softmax(z2)
-
-    return int(np.argmax(probs))
+    pred_index = int(np.argmax(probs))
+    one_hot = np.zeros(10)
+    one_hot[pred_index] = 1
+    return one_hot
+  
