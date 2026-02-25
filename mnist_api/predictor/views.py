@@ -5,6 +5,8 @@ import io
 from django.http import JsonResponse
 from .ml_model import preprocess_canvas_image, predict_top3 ,train_on_sample ,saliency_map
 import numpy as np
+   # 🔥 VERY IMPORTANT
+
 import matplotlib.pyplot as plt
 @csrf_exempt
 def predict_digit(request):
@@ -63,25 +65,29 @@ def explain_digit(request):
             data = json.loads(request.body)
             img = data.get("image")
 
+            if not img:
+                return JsonResponse({"error": "No image provided"}, status=400)
+
+            # ---------- Preprocess ----------
             X = preprocess_canvas_image(img)
 
+            # ---------- Get Heatmap ----------
             heatmap, probs = saliency_map(X)
 
-            # ---------- Convert heatmap to image ----------
-            fig, ax = plt.subplots(figsize=(3,3))
-            ax.imshow(heatmap, cmap="hot")
-            ax.axis("off")
+            # ---------- Normalize heatmap ----------
+            heatmap = heatmap - np.min(heatmap)
+            heatmap = heatmap / (np.max(heatmap) + 1e-8)
 
-            buf = io.BytesIO()
-            plt.savefig(buf, format="png", bbox_inches="tight", pad_inches=0)
-            buf.seek(0)
+            # ---------- Convert to list for JSON ----------
+            heatmap_list = heatmap.tolist()
 
-            img_base64 = base64.b64encode(buf.read()).decode("utf-8")
-            plt.close(fig)
-
-            return JsonResponse({"heatmap": img_base64})
+            return JsonResponse({
+                "heatmap": heatmap_list,
+                "probs": probs.tolist()
+            })
 
         except Exception as e:
+            print("Explain Error:", e)
             return JsonResponse({"error": str(e)}, status=500)
 
     return JsonResponse({"error": "Invalid request"}, status=400)
