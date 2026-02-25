@@ -22,58 +22,59 @@ def softmax(x):
     e = np.exp(x - np.max(x, axis=1, keepdims=True))
     return e / np.sum(e, axis=1, keepdims=True)
 
-def predict(X):
+def predict_top3(X):
     """
     X: numpy array of shape (1, 784), values normalized 0-1
-    Returns: integer 0-9
+    Returns: list of top 3 (digit, probability) tuples
     """
     z1 = X @ W1 + b1
     a1 = relu(z1)
     z2 = a1 @ W2 + b2
-    probs = softmax(z2)
-    return int(np.argmax(probs))
+    probs = softmax(z2)  # shape (1, 10)
+
+    top3_indices = probs[0].argsort()[::-1][:3]  # indices of top 3
+    top3_probs = probs[0, top3_indices]
+
+    # Return list of (digit, probability)
+    return [(int(digit), float(prob)) for digit, prob in zip(top3_indices, top3_probs)]
 
 
 def center_and_pad(img, size=28):
-    """
-    Centers the digit using center-of-mass and pads to maintain aspect ratio.
-    """
     # Threshold to binary
     _, img = cv2.threshold(img, 128, 255, cv2.THRESH_BINARY)
 
-    # Find contours
-    contours, _ = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    if contours:
-        x, y, w, h = cv2.boundingRect(contours[0])
-        digit = img[y:y+h, x:x+w]
+    # Find all non-zero pixels
+    ys, xs = np.where(img > 0)
+    if len(xs) == 0 or len(ys) == 0:
+        # Empty image
+        digit = img
     else:
-        digit = img  # empty canvas
+        x_min, x_max = xs.min(), xs.max()
+        y_min, y_max = ys.min(), ys.max()
+        digit = img[y_min:y_max+1, x_min:x_max+1]
 
     # Resize while keeping aspect ratio
     h, w = digit.shape
-    scale = 20.0 / max(h, w)  # scale largest dimension to 20 pixels
-    new_w = int(w * scale)
-    new_h = int(h * scale)
+    scale = 20.0 / max(h, w)
+    new_w, new_h = int(w * scale), int(h * scale)
     digit_resized = cv2.resize(digit, (new_w, new_h), interpolation=cv2.INTER_AREA)
 
-    # Create 28x28 blank image
+    # Create canvas
     canvas = np.zeros((size, size), dtype=np.uint8)
-
-    # Compute top-left coordinates to paste resized digit
     start_x = (size - new_w) // 2
     start_y = (size - new_h) // 2
     canvas[start_y:start_y+new_h, start_x:start_x+new_w] = digit_resized
 
-    # Center-of-mass shift
-    cy, cx = np.array(np.where(canvas > 0)).mean(axis=1)
-    shiftx = np.round(size/2 - cx).astype(int)
-    shifty = np.round(size/2 - cy).astype(int)
-    M = np.float32([[1, 0, shiftx], [0, 1, shifty]])
-    centered = cv2.warpAffine(canvas, M, (size, size))
+    # Center using center-of-mass
+    ys, xs = np.where(canvas > 0)
+    if len(xs) > 0 and len(ys) > 0:
+        cy, cx = ys.mean(), xs.mean()
+        shiftx, shifty = int(round(size/2 - cx)), int(round(size/2 - cy))
+        M = np.float32([[1, 0, shiftx], [0, 1, shifty]])
+        canvas = cv2.warpAffine(canvas, M, (size, size))
 
     # Normalize
-    centered = centered / 255.0
-    return centered
+    return canvas / 255.0
 
 
 def preprocess_canvas_image(data_url):
