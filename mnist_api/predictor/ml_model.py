@@ -92,3 +92,45 @@ def preprocess_canvas_image(data_url):
 
     # Flatten
     return digit.reshape(1, 784)
+
+
+learning_rate = 0.01
+
+def train_on_sample(X, y_true):
+    """
+    X: shape (1,784)
+    y_true: int 0-9
+    Updates global weights W1,b1,W2,b2 in memory only
+    """
+
+    global W1, b1, W2, b2
+
+    # ---------- Forward ----------
+    z1 = X @ W1 + b1
+    a1 = relu(z1)
+
+    z2 = a1 @ W2 + b2
+    probs = softmax(z2)
+
+    # ---------- One-hot ----------
+    y_onehot = np.zeros((1,10))
+    y_onehot[0, y_true] = 1
+
+    # ---------- Backprop ----------
+    dz2 = probs - y_onehot
+    dW2 = a1.T @ dz2
+    db2 = dz2
+
+    da1 = dz2 @ W2.T
+    dz1 = da1 * (z1 > 0)
+
+    dW1 = X.T @ dz1
+    db1 = dz1
+
+    # ---------- Update ----------
+    W1 -= learning_rate * dW1
+    b1 -= learning_rate * db1
+    W2 -= learning_rate * dW2
+    b2 -= learning_rate * db2
+
+    return probs
