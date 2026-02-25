@@ -1,20 +1,23 @@
 import React, { useRef, useState } from "react";
+import CanvasDraw from "./components/canva";
+import PredictionList from "./components/predictionList";
+import CorrectionBox from "./components/correctionBox";
 
 function App() {
   const canvasRef = useRef(null);
   const [drawing, setDrawing] = useState(false);
   const [predictions, setPredictions] = useState(null);
 
-  const startDrawing = (e) => setDrawing(true);
+  const startDrawing = () => setDrawing(true);
 
   const stopDrawing = () => {
     setDrawing(false);
-    const ctx = canvasRef.current.getContext("2d");
-    ctx.beginPath(); // reset path
+    canvasRef.current.getContext("2d").beginPath();
   };
 
   const draw = (e) => {
     if (!drawing) return;
+
     const ctx = canvasRef.current.getContext("2d");
     const rect = canvasRef.current.getBoundingClientRect();
 
@@ -36,8 +39,7 @@ function App() {
   };
 
   const predictDigit = async () => {
-    const canvas = canvasRef.current;
-    const dataURL = canvas.toDataURL("image/png");
+    const dataURL = canvasRef.current.toDataURL();
 
     try {
       const res = await fetch("http://localhost:8000/api/predict_digit/", {
@@ -47,47 +49,28 @@ function App() {
       });
 
       const result = await res.json();
-      console.log(result.predictions)
-      if (result.predictions) {
-        setPredictions(result.predictions);
-      } else {
-        console.error(result.error);
-      }
-    } catch (err) {
-      console.error("Error:", err);
+      if (result.predictions) setPredictions(result.predictions);
+    } catch (e) {
+      console.error(e);
     }
   };
 
   return (
-    <div style={{ textAlign: "center", marginTop: "20px", color: "white", fontFamily: "sans-serif" }}>
+    <div style={{ textAlign: "center", color: "white", fontFamily: "sans-serif" }}>
       <h1>Draw a Digit</h1>
-      <canvas
-        ref={canvasRef}
-        width={280}
-        height={280}
-        style={{ border: "2px solid white", background: "black", cursor: "crosshair" }}
-        onMouseDown={startDrawing}
-        onMouseUp={stopDrawing}
-        onMouseMove={draw}
+
+      <CanvasDraw
+        canvasRef={canvasRef}
+        startDrawing={startDrawing}
+        stopDrawing={stopDrawing}
+        draw={draw}
+        predictDigit={predictDigit}
+        clearCanvas={clearCanvas}
       />
 
-      <div style={{ marginTop: "10px" }}>
-        <button onClick={predictDigit} style={{ padding: "10px 20px" }}>Predict</button>
-        <button onClick={clearCanvas} style={{ padding: "10px 20px", marginLeft: "10px" }}>Clear</button>
-      </div>
+      <PredictionList predictions={predictions} />
 
-     {predictions && predictions.length > 0 && (
-  <div style={{ marginTop: "20px", background:"red" }}>
-    <h2>Top 3 Predictions:</h2>
-   <ul style={{ listStyle: "none", padding: 0, fontSize: "1.2em", color: "white" }}>
-  {predictions.map((p, idx) => (
-    <li key={idx} style={{ color: "white" }}>
-      Digit <strong>{p.digit}</strong> → Probability: <strong>{(p.probability * 100).toFixed(1)}%</strong>
-    </li>
-  ))}
-</ul>
-  </div>
-)}
+      <CorrectionBox canvasRef={canvasRef} onTrained={predictDigit} />
     </div>
   );
 }
