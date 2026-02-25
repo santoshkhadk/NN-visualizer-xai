@@ -1,9 +1,11 @@
 import json
 from django.views.decorators.csrf import csrf_exempt
+import base64
+import io
 from django.http import JsonResponse
 from .ml_model import preprocess_canvas_image, predict_top3 ,train_on_sample ,saliency_map
 import numpy as np
-
+import matplotlib.pyplot as plt
 @csrf_exempt
 def predict_digit(request):
     if request.method == "POST":
@@ -59,17 +61,27 @@ def explain_digit(request):
     if request.method == "POST":
         try:
             data = json.loads(request.body)
-            data_url = data.get("image")
+            img = data.get("image")
 
-            X = preprocess_canvas_image(data_url)
+            X = preprocess_canvas_image(img)
 
             heatmap, probs = saliency_map(X)
-            print(heatmap[0])
 
-            return JsonResponse({
-                "heatmap": heatmap.tolist(),
-                "prediction": int(np.argmax(probs))
-            })
+            # ---------- Convert heatmap to image ----------
+            fig, ax = plt.subplots(figsize=(3,3))
+            ax.imshow(heatmap, cmap="hot")
+            ax.axis("off")
+
+            buf = io.BytesIO()
+            plt.savefig(buf, format="png", bbox_inches="tight", pad_inches=0)
+            buf.seek(0)
+
+            img_base64 = base64.b64encode(buf.read()).decode("utf-8")
+            plt.close(fig)
+
+            return JsonResponse({"heatmap": img_base64})
 
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=500)
+
+    return JsonResponse({"error": "Invalid request"}, status=400)
