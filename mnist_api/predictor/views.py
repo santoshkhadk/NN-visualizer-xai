@@ -2,6 +2,7 @@ import json
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 from .ml_model import preprocess_canvas_image, predict_top3 ,train_on_sample ,saliency_map
+import numpy as np
 
 @csrf_exempt
 def predict_digit(request):
@@ -63,6 +64,7 @@ def explain_digit(request):
             X = preprocess_canvas_image(data_url)
 
             heatmap, probs = saliency_map(X)
+            print(heatmap[0])
 
             return JsonResponse({
                 "heatmap": heatmap.tolist(),
