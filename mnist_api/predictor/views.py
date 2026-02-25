@@ -1,26 +1,24 @@
 import json
-import numpy as np
-from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from .ml_model import predict
+from django.http import JsonResponse
+from .ml_model import predict, preprocess_canvas_image
 
 @csrf_exempt
 def predict_digit(request):
     if request.method == "POST":
         try:
-            body = json.loads(request.body)
-            pixels = np.array(body["pixels"]).reshape(1, -1)  # (1, 784)
+            data = json.loads(request.body)
+            data_url = data.get("image")  # base64 canvas image
 
-            # Get one-hot prediction
-            result = predict(pixels).tolist() 
-            pred_index = int(np.argmax(result)) # ✅ Convert to Python list
-             # Convert to list for JSON
+            if not data_url:
+                return JsonResponse({"error": "No image provided"}, status=400)
 
-            return JsonResponse({
-                "prediction": pred_index
-            })
+            # Preprocess and predict
+            X = preprocess_canvas_image(data_url)
+            result = predict(X)
 
+            return JsonResponse({"prediction": result})
         except Exception as e:
-            return JsonResponse({"error": str(e)}, status=400)
+            return JsonResponse({"error": str(e)}, status=500)
 
-    return JsonResponse({"message": "Send POST request"})
+    return JsonResponse({"error": "Invalid request"}, status=400)
