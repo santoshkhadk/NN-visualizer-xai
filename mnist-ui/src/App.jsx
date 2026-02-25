@@ -2,6 +2,7 @@ import React, { useRef, useState } from "react";
 import CanvasDraw from "./components/canva";
 import PredictionList from "./components/predictionList";
 import CorrectionBox from "./components/correctionBox";
+import ExplainHeatmap from "./components/heatmap";
 
 function App() {
   const canvasRef = useRef(null);
@@ -71,6 +72,7 @@ function App() {
       <PredictionList predictions={predictions} />
 
       <CorrectionBox canvasRef={canvasRef} onTrained={predictDigit} />
+      <ExplainHeatmap canvasRef={canvasRef} />
     </div>
   );
 }
