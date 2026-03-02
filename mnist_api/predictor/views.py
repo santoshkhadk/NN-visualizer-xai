@@ -3,7 +3,7 @@ from django.views.decorators.csrf import csrf_exempt
 import base64
 import io
 from django.http import JsonResponse
-from .ml_model import preprocess_canvas_image, predict_top3 ,train_on_sample ,saliency_map
+from .ml_model import preprocess_canvas_image, predict_top3 ,train_on_sample ,saliency_map,neuron_pixel_contributions,neuron_class_contributions
 import numpy as np
 
 
@@ -67,27 +67,27 @@ def explain_digit(request):
             if not img:
                 return JsonResponse({"error": "No image provided"}, status=400)
 
-            # Preprocess input
             X = preprocess_canvas_image(img)
 
-            # Compute pixel heatmap, probs, hidden activations
-            pixel_heatmap, probs, hidden_activations = saliency_map(X)
+            # Call your neuron_class_contributions function which returns everything needed
+            top_k = 3
+            top_neuron_maps, top_neurons, probs, hidden_activations, predicted_class, neuron_class_contribs = neuron_class_contributions(X, top_k)
 
-            # Normalize pixel heatmap
-            pixel_heatmap = pixel_heatmap - pixel_heatmap.min()
-            pixel_heatmap = pixel_heatmap / (pixel_heatmap.max() + 1e-8)
+            # Pixel saliency map
+            pixel_heatmap, _, _ = saliency_map(X)
 
-            # Get top neuron & predicted class
-            top_neuron_idx = int(hidden_activations.argmax())
-            predicted_class = int(probs.argmax())
+            # Normalize pixel heatmaps and neuron maps for frontend
+            pixel_heatmap = (pixel_heatmap - np.min(pixel_heatmap)) / (np.max(pixel_heatmap) + 1e-8)
+            norm_neuron_maps = [(m - np.min(m)) / (np.max(m) + 1e-8) for m in top_neuron_maps]
 
-            # Return everything for frontend visualization
             return JsonResponse({
-                "heatmap": pixel_heatmap.tolist(),
+                "pixel_heatmap": pixel_heatmap.tolist(),
+                "top_neuron_maps": [m.tolist() for m in norm_neuron_maps],
+                "top_neurons": top_neurons.tolist(),
                 "hidden_activations": hidden_activations.tolist(),
                 "output_probs": probs.tolist(),
-                "top_neuron": top_neuron_idx,
-                "predicted_class": predicted_class
+                "predicted_class": predicted_class,
+                "neuron_class_contribs": neuron_class_contribs
             })
 
         except Exception as e:

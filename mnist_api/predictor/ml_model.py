@@ -131,6 +131,8 @@ def train_on_sample(X, y_true):
     b2 -= learning_rate * db2
 
     return probs
+
+    
 def saliency_map(X):
     """
     Returns:
@@ -153,4 +155,71 @@ def saliency_map(X):
     dX = dz1 @ W1.T
     importance = np.abs(dX)
 
+
     return importance.reshape(28,28), probs, a1
+def neuron_pixel_contributions(X, top_k=3):
+    """
+    Returns:
+        contributions: list of top_k neurons' pixel importance heatmaps
+        top_neurons: indices of top_k neurons
+    """
+    # Forward
+    z1 = X @ W1 + b1
+    a1 = relu(z1)
+    z2 = a1 @ W2 + b2
+    probs = softmax(z2)
+    predicted_class = np.argmax(probs)
+
+    # Find top_k neurons
+    top_indices = a1[0].argsort()[::-1][:top_k]
+
+    contributions = []
+    for i in top_indices:
+        # Contribution of neuron i to predicted class in pixel space
+        pixel_contrib = a1[0,i] * W1[:, i]  # shape: 784
+        contributions.append(pixel_contrib.reshape(28,28))
+
+    return contributions, top_indices, probs, a1
+def neuron_class_contributions(X, top_k=3):
+    """
+    Returns per-neuron contributions to the predicted class in pixel space.
+
+    Args:
+        X: Input array of shape (1, 784)
+        top_k: Number of top contributing neurons to return
+
+    Returns:
+        top_neuron_maps: list of pixel-level heatmaps (28x28) for top_k neurons
+        top_neurons: indices of top_k neurons
+        probs: output probabilities
+        hidden_activations: hidden layer activations
+        predicted_class: integer class predicted
+        neuron_class_contribs: contribution of each top neuron to predicted class
+    """
+    # Forward pass
+    z1 = X @ W1 + b1
+    a1 = relu(z1)
+    z2 = a1 @ W2 + b2
+    probs = softmax(z2)
+    predicted_class = int(np.argmax(probs))
+
+    # Compute contribution of each hidden neuron to predicted class
+    neuron_contrib_values = a1[0] * W2[:, predicted_class]  # shape: (hidden_size,)
+
+    # Pick top_k neurons by contribution
+    top_indices = neuron_contrib_values.argsort()[::-1][:top_k]
+
+    # Map each top neuron’s contribution back to pixels
+    top_neuron_maps = []
+    top_neuron_class_contribs = []
+    for i in top_indices:
+        # Pixel-level map
+        pixel_map = neuron_contrib_values[i] * W1[:, i]  # 784
+        pixel_map = pixel_map.reshape(28,28)
+        pixel_map = pixel_map - np.min(pixel_map)
+        pixel_map = pixel_map / (np.max(pixel_map)+1e-8)
+        top_neuron_maps.append(pixel_map)
+        # Contribution value
+        top_neuron_class_contribs.append(float(neuron_contrib_values[i]))
+
+    return top_neuron_maps, top_indices, probs, a1, predicted_class, top_neuron_class_contribs
