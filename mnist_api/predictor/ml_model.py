@@ -133,26 +133,24 @@ def train_on_sample(X, y_true):
     return probs
 def saliency_map(X):
     """
-    Returns importance of each pixel (1,784)
+    Returns:
+        importance: pixel importance (28x28)
+        probs: output probabilities
+        a1: hidden layer activations
     """
-
-    # ---------- Forward ----------
+    # Forward
     z1 = X @ W1 + b1
     a1 = relu(z1)
     z2 = a1 @ W2 + b2
     probs = softmax(z2)
 
+    # Pixel importance (gradient of top class w.r.t input)
     pred_class = np.argmax(probs)
-
-    # ---------- Backprop ----------
     dz2 = np.zeros_like(z2)
-    dz2[0, pred_class] = 1   # derivative of score wrt z2
-
+    dz2[0, pred_class] = 1
     da1 = dz2 @ W2.T
     dz1 = da1 * (z1 > 0)
-
-    dX = dz1 @ W1.T   # gradient wrt input pixels
-
+    dX = dz1 @ W1.T
     importance = np.abs(dX)
 
-    return importance.reshape(28, 28), probs
+    return importance.reshape(28,28), probs, a1
