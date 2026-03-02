@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import Plot from "react-plotly.js";
 
 function ExplainHeatmap({ canvasRef }) {
   const [heatmap, setHeatmap] = useState(null);
@@ -15,7 +16,7 @@ function ExplainHeatmap({ canvasRef }) {
     const result = await res.json();
 
     if (result.heatmap) {
-      setHeatmap(result.heatmap);
+      setHeatmap(result.heatmap); // this is 28x28 matrix
     } else {
       console.error(result.error);
     }
@@ -26,12 +27,25 @@ function ExplainHeatmap({ canvasRef }) {
       <button onClick={explainDigit}>Explain Prediction</button>
 
       {heatmap && (
-        <div style={{ marginTop: "15px" }}>
+        <div style={{ marginTop: "20px" }}>
           <h3>Pixel Importance Heatmap</h3>
-          <img
-            src={`data:image/png;base64,${heatmap}`}
-            alt="Heatmap"
-            style={{ border: "2px solid white", width: "200px" }}
+
+          <Plot
+            data={[
+              {
+                z: heatmap,          // 28x28 matrix
+                type: "heatmap",
+                colorscale: "Jet",
+              },
+            ]}
+            layout={{
+              width: 400,
+              height: 400,
+              xaxis: { visible: false },
+              yaxis: { visible: false, autorange: "reversed" },
+              margin: { l: 20, r: 20, t: 20, b: 20 },
+            }}
+            config={{ displayModeBar: false }}
           />
         </div>
       )}
