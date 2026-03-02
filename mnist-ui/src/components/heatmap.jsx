@@ -4,8 +4,8 @@ import Plot from "react-plotly.js";
 function ExplainHeatmap({ canvasRef }) {
   const [pixelHeatmap, setPixelHeatmap] = useState(null);
   const [hiddenActivations, setHiddenActivations] = useState(null);
-  const [outputProbs, setOutputProbs] = useState(null);
   const [topNeuron, setTopNeuron] = useState(null);
+  const [outputProbs, setOutputProbs] = useState(null);
   const [predictedClass, setPredictedClass] = useState(null);
 
   const explainDigit = async () => {
@@ -22,9 +22,9 @@ function ExplainHeatmap({ canvasRef }) {
 
       if (result.heatmap) {
         setPixelHeatmap(result.heatmap);
-        setHiddenActivations(result.hidden_activations[0]); // flatten 1D if needed
-        setOutputProbs(result.output_probs[0]);
+        setHiddenActivations(result.hidden_activations[0]); // flatten
         setTopNeuron(result.top_neuron);
+        setOutputProbs(result.output_probs[0]);
         setPredictedClass(result.predicted_class);
       } else {
         console.error(result.error);
@@ -34,13 +34,27 @@ function ExplainHeatmap({ canvasRef }) {
     }
   };
 
+  // Prepare colors for hidden activations bar chart
+  const getNeuronColors = () => {
+    if (!hiddenActivations) return [];
+    // Find top 3 neurons
+    const sortedIndices = hiddenActivations
+      .map((val, idx) => ({ val, idx }))
+      .sort((a, b) => b.val - a.val)
+      .map((obj) => obj.idx);
+    const top3 = new Set(sortedIndices.slice(0, 3));
+    return hiddenActivations.map((_, idx) =>
+      top3.has(idx) ? "red" : "orange"
+    );
+  };
+
   return (
     <div style={{ marginTop: "20px" }}>
       <button onClick={explainDigit}>Explain Prediction</button>
 
       {pixelHeatmap && hiddenActivations && (
         <div style={{ display: "flex", gap: "40px", marginTop: "20px" }}>
-          {/* Pixel Importance Heatmap */}
+          {/* Pixel Heatmap */}
           <div>
             <h3>Pixel Importance Heatmap</h3>
             <Plot
@@ -62,7 +76,7 @@ function ExplainHeatmap({ canvasRef }) {
             />
           </div>
 
-          {/* Hidden Neuron Activations */}
+          {/* Hidden Activations */}
           <div>
             <h3>Hidden Layer Activations</h3>
             <Plot
@@ -70,7 +84,7 @@ function ExplainHeatmap({ canvasRef }) {
                 {
                   y: hiddenActivations,
                   type: "bar",
-                  marker: { color: "orange" },
+                  marker: { color: getNeuronColors() },
                 },
               ]}
               layout={{
@@ -90,7 +104,7 @@ function ExplainHeatmap({ canvasRef }) {
         </div>
       )}
 
-      {/* Optional: Output probabilities bar chart */}
+      {/* Output probabilities */}
       {outputProbs && (
         <div style={{ marginTop: "20px" }}>
           <h3>Output Probabilities</h3>
