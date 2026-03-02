@@ -124,7 +124,6 @@ function ExplainHeatmap({ canvasRef }) {
             )}
           </div>
 
-          {/* Right Column: Hidden Activations */}
           <div>
             <h3>Hidden Layer Activations</h3>
             <Plot
