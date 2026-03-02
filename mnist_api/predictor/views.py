@@ -64,24 +64,30 @@ def explain_digit(request):
         try:
             data = json.loads(request.body)
             img = data.get("image")
-
             if not img:
                 return JsonResponse({"error": "No image provided"}, status=400)
 
-           
+            # Preprocess input
             X = preprocess_canvas_image(img)
 
-        
-            heatmap, probs = saliency_map(X)
+            # Compute pixel heatmap, probs, hidden activations
+            pixel_heatmap, probs, hidden_activations = saliency_map(X)
 
-            heatmap = heatmap - np.min(heatmap)
-            heatmap = heatmap / (np.max(heatmap) + 1e-8)
+            # Normalize pixel heatmap
+            pixel_heatmap = pixel_heatmap - pixel_heatmap.min()
+            pixel_heatmap = pixel_heatmap / (pixel_heatmap.max() + 1e-8)
 
-            heatmap_list = heatmap.tolist()
+            # Get top neuron & predicted class
+            top_neuron_idx = int(hidden_activations.argmax())
+            predicted_class = int(probs.argmax())
 
+            # Return everything for frontend visualization
             return JsonResponse({
-                "heatmap": heatmap_list,
-                "probs": probs.tolist()
+                "heatmap": pixel_heatmap.tolist(),
+                "hidden_activations": hidden_activations.tolist(),
+                "output_probs": probs.tolist(),
+                "top_neuron": top_neuron_idx,
+                "predicted_class": predicted_class
             })
 
         except Exception as e:
