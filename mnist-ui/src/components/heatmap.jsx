@@ -14,6 +14,12 @@ function ExplainHeatmap({ canvasRef }) {
   // 🔥 NEW STATE for processed 28x28 image
   const [processedImage, setProcessedImage] = useState([]);
 
+  // 🔹 IG-related states
+  const [pixelIG, setPixelIG] = useState([]);
+  const [neuronIG, setNeuronIG] = useState([]);
+  const [topNeuronsIGMaps, setTopNeuronsIGMaps] = useState([]);
+  const [topNeuronsIGIdx, setTopNeuronsIGIdx] = useState([]);
+
   const [deactivated, setDeactivated] = useState([]);
 
   const explainDigit = async () => {
@@ -31,24 +37,29 @@ function ExplainHeatmap({ canvasRef }) {
 
       const result = await res.json();
 
-     if (result.explanation) {
-  const exp = result.explanation;
+      if (result.explanation) {
+        const exp = result.explanation;
 
-  setPixelHeatmap(exp.pixel_heatmap || []);
-  setTopNeuronMaps(exp.top_neuron_maps || []);
-  setNeuronClassContribs(exp.neuron_class_contribs || []);
-  setSelectedNeuron(0);
-  setHiddenActivations(exp.hidden_activations?.[0] || []);
-  setTopNeurons(exp.top_neurons || []);
-  setOutputProbs(exp.output_probs );
-  setPredictedClass(exp.predicted_class ?? null);
+        // 🔹 Existing feature states (do NOT remove)
+        setPixelHeatmap(exp.pixel_heatmap || []);
+        setTopNeuronMaps(exp.top_neuron_maps || []);
+        setNeuronClassContribs(exp.neuron_class_contribs || []);
+        setSelectedNeuron(0);
+        setHiddenActivations(exp.hidden_activations?.[0] || []);
+        setTopNeurons(exp.top_neurons || []);
+        setOutputProbs(exp.output_probs);
+        setPredictedClass(exp.predicted_class ?? null);
+        setProcessedImage(result.processed_image || []);
 
-  // 🔥 SET processed image
-  setProcessedImage(result.processed_image || []);
-} else {
-  console.error(result.error);
-}
+        // 🔹 NEW IG features
+        if (exp.pixel_ig) setPixelIG(exp.pixel_ig);
+        if (exp.neuron_ig) setNeuronIG(exp.neuron_ig);
+        if (exp.top_neurons_ig_maps) setTopNeuronsIGMaps(exp.top_neurons_ig_maps);
+        if (exp.top_neurons_ig_idx) setTopNeuronsIGIdx(exp.top_neurons_ig_idx);
 
+      } else {
+        console.error(result.error);
+      }
     } catch (err) {
       console.error("Error fetching explanation:", err);
     }
@@ -84,14 +95,13 @@ function ExplainHeatmap({ canvasRef }) {
             data={[{
               z: processedImage,
               type: "heatmap",
-              colorscale: "grey" ,
-             interpolation: 'none',
+              colorscale: "grey",
+              interpolation: 'none',
               origin: 'upper',
-              
             }]}
             layout={{
-               width: 400,
-                height: 400,
+              width: 400,
+              height: 400,
               xaxis: { visible: false },
               yaxis: { visible: false, autorange: "reversed" },
               margin: { l: 20, r: 20, t: 20, b: 20 }
@@ -103,7 +113,7 @@ function ExplainHeatmap({ canvasRef }) {
 
       {pixelHeatmap.length > 0 && hiddenActivations.length > 0 && (
         <div style={{ display: "flex", gap: "40px", marginTop: "20px" }}>
-          
+
           {/* LEFT COLUMN */}
           <div>
             <h3>Pixel Importance Heatmap</h3>
@@ -152,6 +162,48 @@ function ExplainHeatmap({ canvasRef }) {
                 config={{ displayModeBar: false }}
               />
             )}
+
+            {/* 🔹 NEW IG Pixel Heatmap */}
+            {pixelIG.length > 0 && (
+              <div style={{ marginTop: "20px" }}>
+                <h4>Integrated Gradients Pixel Heatmap</h4>
+                <Plot
+                  data={[{ z: pixelIG, type: "heatmap", colorscale: "Viridis" }]}
+                  layout={{
+                    width: 400,
+                    height: 400,
+                    xaxis: { visible: false },
+                    yaxis: { visible: false, autorange: "reversed" },
+                    margin: { l: 20, r: 20, t: 20, b: 20 }
+                  }}
+                  config={{ displayModeBar: false }}
+                />
+              </div>
+            )}
+
+            {/* 🔹 IG Top Neurons Maps */}
+            {topNeuronsIGMaps.length > 0 && (
+              <div>
+                <h4>Top Neuron IG Maps</h4>
+                <div style={{ display: "flex", gap: "10px" }}>
+                  {topNeuronsIGMaps.map((m, idx) => (
+                    <Plot
+                      key={idx}
+                      data={[{ z: m, type: "heatmap", colorscale: "Viridis" }]}
+                      layout={{
+                        width: 400,
+                        height: 400,
+                        xaxis: { visible: false },
+                        yaxis: { visible: false, autorange: "reversed" },
+                        margin: { l: 5, r: 5, t: 5, b: 5 }
+                      }}
+                      config={{ displayModeBar: false }}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
           </div>
 
           {/* RIGHT COLUMN */}
@@ -179,7 +231,7 @@ function ExplainHeatmap({ canvasRef }) {
               <strong>Top neurons:</strong> {topNeurons.join(", ")}
             </p>
 
-            <div  style={{ background: "red" }}>
+            <div style={{ background: "red" }}>
               <h4>Deactivate Neurons</h4>
               {topNeurons.map(n => (
                 <label key={n} style={{ display: "block" }}>
@@ -202,7 +254,7 @@ function ExplainHeatmap({ canvasRef }) {
           <Plot
             data={[{
               x: [...Array(10).keys()],
-              y: outputProbs,
+              y: outputProbs.flat(),
               type: "bar",
               marker: { color: "green" }
             }]}
