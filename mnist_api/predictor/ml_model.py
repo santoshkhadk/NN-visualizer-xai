@@ -223,3 +223,68 @@ def neuron_class_contributions(X, top_k=3):
         top_neuron_class_contribs.append(float(neuron_contrib_values[i]))
 
     return top_neuron_maps, top_indices, probs, a1, predicted_class, top_neuron_class_contribs
+
+import numpy as np
+
+def explain_with_deactivation(X, deactivate=[], top_k=3):
+    """
+    Explains a digit prediction and allows temporary deactivation of selected neurons.
+    
+    Args:
+        X: Input array (1, 784)
+        deactivate: List of neuron indices to temporarily zero
+        top_k: Number of top neurons to highlight
+
+    Returns:
+        Dictionary containing pixel heatmap, neuron maps, top neurons,
+        hidden activations, output probabilities, predicted class, neuron contributions
+    """
+    global W1, b1, W2, b2
+
+    # Forward pass
+    z1 = X @ W1 + b1
+    a1 = np.maximum(0, z1)  # ReLU
+
+    # Copy hidden activations and deactivate selected neurons
+    a1_copy = a1.copy()
+    for n in deactivate:
+        if 0 <= n < a1_copy.shape[1]:
+            a1_copy[0, n] = 0.0
+
+    # Recompute output logits using deactivated hidden activations
+    z2 = a1_copy @ W2 + b2
+    exp = np.exp(z2 - np.max(z2, axis=1, keepdims=True))
+    probs = exp / np.sum(exp, axis=1, keepdims=True)
+
+    predicted_class = int(np.argmax(probs))
+
+    # Compute contribution of each hidden neuron to predicted class
+    neuron_contrib_values = a1_copy[0] * W2[:, predicted_class]
+
+    # Pick top_k neurons
+    top_indices = neuron_contrib_values.argsort()[::-1][:top_k]
+
+    # Map top neurons’ contribution back to pixels
+    top_neuron_maps = []
+    top_neuron_class_contribs = []
+    for i in top_indices:
+        pixel_map = neuron_contrib_values[i] * W1[:, i]
+        pixel_map = pixel_map.reshape(28,28)
+        pixel_map = pixel_map - np.min(pixel_map)
+        pixel_map = pixel_map / (np.max(pixel_map)+1e-8)
+        top_neuron_maps.append(pixel_map)
+        top_neuron_class_contribs.append(float(neuron_contrib_values[i]))
+
+    # Pixel saliency map (using original X)
+    pixel_heatmap, _, _ = saliency_map(X)
+    pixel_heatmap = (pixel_heatmap - np.min(pixel_heatmap)) / (np.max(pixel_heatmap)+1e-8)
+
+    return {
+        "pixel_heatmap": pixel_heatmap,
+        "top_neuron_maps": top_neuron_maps,
+        "top_neurons": top_indices,
+        "hidden_activations": a1_copy,
+        "output_probs": probs,
+        "predicted_class": predicted_class,
+        "neuron_class_contribs": top_neuron_class_contribs
+    }
