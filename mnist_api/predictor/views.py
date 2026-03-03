@@ -18,8 +18,7 @@ def predict_digit(request):
             if not data_url:
                 return JsonResponse({"error": "No image provided"}, status=400)
 
-         
-            X = preprocess_canvas_image(data_url)
+            digit_28x28, X = preprocess_canvas_image(data_url) 
 
             top3 = predict_top3(X)
 
@@ -69,7 +68,7 @@ def explain_digit(request):
             if not img:
                 return JsonResponse({"error": "No image provided"}, status=400)
 
-            X = preprocess_canvas_image(img)
+            digit_28x28, X = preprocess_canvas_image(img) 
 
             # Call the model function with deactivation
             explanation = explain_with_deactivation(X, deactivate=deactivate, top_k=3)
@@ -89,7 +88,8 @@ def explain_digit(request):
             explanation["output_probs"] = probs_after.tolist()
             explanation["predicted_class"] = pred_class_after  # Add updated prediction
 
-            return JsonResponse(explanation)
+            return JsonResponse({"explanation":explanation,
+                                 "processed_image": digit_28x28.tolist(),})
 
         except Exception as e:
             print("Explain Error:", e)
