@@ -76,14 +76,23 @@ def center_and_pad(img, size=28):
     return canvas / 255.0
 
 
+
+
 def preprocess_canvas_image(data_url):
     """
-    Converts base64 React canvas image to:
-    - 28x28 grayscale image (for visualization)
-    - flattened (1, 784) array (for model)
+    Converts a base64 React canvas image to:
+      - 28x28 grayscale image (for visualization)
+      - flattened (1, 784) array (for model input)
+    
+    Args:
+        data_url (str): base64 string from React canvas
+    
+    Returns:
+        tuple: (digit_28x28, digit_flat)
+            digit_28x28: 28x28 numpy array, normalized 0-1
+            digit_flat: flattened array of shape (1, 784)
     """
-
-    # Decode base64
+    # Decode base64 header
     header, encoded = data_url.split(",", 1)
     data = base64.b64decode(encoded)
 
@@ -94,16 +103,12 @@ def preprocess_canvas_image(data_url):
     # Center and resize to 28x28
     digit_28x28 = center_and_pad(img, size=28)
 
-    # Normalize (VERY IMPORTANT if your model expects 0-1)
-   
-    # Flatten for model
-    digit_flat = digit_28x28.reshape(1, 784)
+    # Flatten for model input
+    X = digit_28x28.reshape(1, 784)
 
-    # 🔥 Return BOTH
-    return digit_28x28, digit_flat
+    return digit_28x28, X
 
-
-learning_rate = 0.01
+learning_rate=0.1
 
 def train_on_sample(X, y_true):
     """
@@ -297,4 +302,74 @@ def explain_with_deactivation(X, deactivate=[], top_k=3):
         "output_probs": probs,
         "predicted_class": predicted_class,
         "neuron_class_contribs": top_neuron_class_contribs
+    }
+def integrated_gradients(X, target_class=None, baseline=None, steps=50, top_k=3):
+    """
+    Compute Integrated Gradients for input X.
+    
+    Args:
+        X: Input (1,784) numpy array
+        target_class: int, class to explain; defaults to model prediction
+        baseline: numpy array same shape as X, default all zeros
+        steps: number of interpolation steps
+        top_k: number of top neurons to highlight
+
+    Returns:
+        dict with:
+            pixel_ig: pixel-level attributions (28x28)
+            neuron_ig: neuron-level attributions (hidden layer)
+            top_neurons_idx: indices of top_k neurons
+            top_neurons_ig_maps: pixel-level maps of top_k neurons
+    """
+    global W1, b1, W2, b2
+    
+    if baseline is None:
+        baseline = np.zeros_like(X)
+    
+    # Forward pass to get prediction if target_class is None
+    _, probs, a1 = saliency_map(X)
+    if target_class is None:
+        target_class = int(np.argmax(probs))
+    
+    # Initialize accumulators
+    pixel_gradients = np.zeros_like(X)
+    neuron_gradients = np.zeros(a1.shape[1])
+    
+    # Linear interpolation between baseline and input
+    for i in range(steps + 1):
+        x_step = baseline + (i / steps) * (X - baseline)
+        z1 = x_step @ W1 + b1
+        a1_step = relu(z1)
+        z2 = a1_step @ W2 + b2
+        exp = np.exp(z2 - np.max(z2, axis=1, keepdims=True))
+        probs_step = exp / np.sum(exp, axis=1, keepdims=True)
+
+        # Grad of output w.r.t hidden layer
+        dz2 = np.zeros_like(z2)
+        dz2[0, target_class] = 1
+        da1 = dz2 @ W2.T
+        dz1 = da1 * (z1 > 0)
+
+        # Grad of output w.r.t input pixels
+        dX = dz1 @ W1.T
+        pixel_gradients += dX
+        neuron_gradients += a1_step[0] * W2[:, target_class]
+
+    pixel_ig = (X - baseline) * (pixel_gradients / steps)
+    neuron_ig = neuron_gradients / steps
+
+    # Top_k neurons by IG
+    top_neurons_idx = neuron_ig.argsort()[::-1][:top_k]
+    top_neurons_ig_maps = []
+    for idx in top_neurons_idx:
+        pixel_map = neuron_ig[idx] * W1[:, idx]
+        pixel_map = pixel_map.reshape(28,28)
+        pixel_map = (pixel_map - pixel_map.min()) / (pixel_map.max() + 1e-8)
+        top_neurons_ig_maps.append(pixel_map)
+
+    return {
+        "pixel_ig": pixel_ig.reshape(28,28),
+        "neuron_ig": neuron_ig,
+        "top_neurons_idx": top_neurons_idx,
+        "top_neurons_ig_maps": top_neurons_ig_maps
     }
