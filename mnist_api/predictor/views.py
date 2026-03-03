@@ -3,7 +3,7 @@ from django.views.decorators.csrf import csrf_exempt
 import base64
 import io
 from django.http import JsonResponse
-from .ml_model import preprocess_canvas_image, predict_top3 ,train_on_sample ,saliency_map,neuron_pixel_contributions,neuron_class_contributions
+from .ml_model import preprocess_canvas_image, predict_top3 ,train_on_sample ,saliency_map,neuron_pixel_contributions,neuron_class_contributions,explain_with_deactivation
 import numpy as np
 
 
@@ -64,31 +64,32 @@ def explain_digit(request):
         try:
             data = json.loads(request.body)
             img = data.get("image")
+            deactivate = data.get("deactivate_neurons", [])
+
             if not img:
                 return JsonResponse({"error": "No image provided"}, status=400)
 
             X = preprocess_canvas_image(img)
 
-            # Call your neuron_class_contributions function which returns everything needed
-            top_k = 3
-            top_neuron_maps, top_neurons, probs, hidden_activations, predicted_class, neuron_class_contribs = neuron_class_contributions(X, top_k)
+            # Call the model function with deactivation
+            explanation = explain_with_deactivation(X, deactivate=deactivate, top_k=3)
 
-            # Pixel saliency map
-            pixel_heatmap, _, _ = saliency_map(X)
+            # Recompute prediction after deactivation
+            # (explanation["output_probs"] should already be logits/probs from the deactivated network)
+            probs_after = explanation["output_probs"]
+            if isinstance(probs_after, np.ndarray):
+                probs_after = probs_after.flatten()
+            pred_class_after = int(np.argmax(probs_after))
 
-            # Normalize pixel heatmaps and neuron maps for frontend
-            pixel_heatmap = (pixel_heatmap - np.min(pixel_heatmap)) / (np.max(pixel_heatmap) + 1e-8)
-            norm_neuron_maps = [(m - np.min(m)) / (np.max(m) + 1e-8) for m in top_neuron_maps]
+            # Convert numpy arrays to lists for JSON
+            explanation["pixel_heatmap"] = explanation["pixel_heatmap"].tolist()
+            explanation["top_neuron_maps"] = [m.tolist() for m in explanation["top_neuron_maps"]]
+            explanation["top_neurons"] = explanation["top_neurons"].tolist()
+            explanation["hidden_activations"] = explanation["hidden_activations"].tolist()
+            explanation["output_probs"] = probs_after.tolist()
+            explanation["predicted_class"] = pred_class_after  # Add updated prediction
 
-            return JsonResponse({
-                "pixel_heatmap": pixel_heatmap.tolist(),
-                "top_neuron_maps": [m.tolist() for m in norm_neuron_maps],
-                "top_neurons": top_neurons.tolist(),
-                "hidden_activations": hidden_activations.tolist(),
-                "output_probs": probs.tolist(),
-                "predicted_class": predicted_class,
-                "neuron_class_contribs": neuron_class_contribs
-            })
+            return JsonResponse(explanation)
 
         except Exception as e:
             print("Explain Error:", e)
