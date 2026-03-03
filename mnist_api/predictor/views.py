@@ -3,7 +3,7 @@ from django.views.decorators.csrf import csrf_exempt
 import base64
 import io
 from django.http import JsonResponse
-from .ml_model import preprocess_canvas_image, predict_top3 ,train_on_sample ,saliency_map,neuron_pixel_contributions,neuron_class_contributions,explain_with_deactivation
+from .ml_model import preprocess_canvas_image, predict_top3 ,train_on_sample ,saliency_map,neuron_pixel_contributions,neuron_class_contributions,explain_with_deactivation,integrated_gradients 
 import numpy as np
 
 
@@ -68,28 +68,35 @@ def explain_digit(request):
             if not img:
                 return JsonResponse({"error": "No image provided"}, status=400)
 
-            digit_28x28, X = preprocess_canvas_image(img) 
+            # Preprocess image
+            digit_28x28, X = preprocess_canvas_image(img)
 
-            # Call the model function with deactivation
+            # 1️⃣ Existing deactivation-based explanation
             explanation = explain_with_deactivation(X, deactivate=deactivate, top_k=3)
 
-            # Recompute prediction after deactivation
-            # (explanation["output_probs"] should already be logits/probs from the deactivated network)
-            probs_after = explanation["output_probs"]
-            if isinstance(probs_after, np.ndarray):
-                probs_after = probs_after.flatten()
-            pred_class_after = int(np.argmax(probs_after))
+            # 2️⃣ Integrated Gradients explanation
+         # ensure this function is imported
+            ig_result = integrated_gradients(X, top_k=3)
 
+# Merge into your explanation dict
+
+           
             # Convert numpy arrays to lists for JSON
             explanation["pixel_heatmap"] = explanation["pixel_heatmap"].tolist()
             explanation["top_neuron_maps"] = [m.tolist() for m in explanation["top_neuron_maps"]]
             explanation["top_neurons"] = explanation["top_neurons"].tolist()
             explanation["hidden_activations"] = explanation["hidden_activations"].tolist()
-            explanation["output_probs"] = probs_after.tolist()
-            explanation["predicted_class"] = pred_class_after  # Add updated prediction
+            explanation["output_probs"] = explanation["output_probs"].tolist()
+            explanation["predicted_class"] = int(explanation["predicted_class"])
 
-            return JsonResponse({"explanation":explanation,
-                                 "processed_image": digit_28x28.tolist(),})
+            explanation["pixel_ig"] = ig_result["pixel_ig"].tolist()
+            explanation["neuron_ig"] = ig_result["neuron_ig"].tolist()
+            explanation["top_neurons_ig_idx"] = ig_result["top_neurons_idx"].tolist()
+            explanation["top_neurons_ig_maps"] = [ m.tolist() for m in ig_result["top_neurons_ig_maps"]]
+            return JsonResponse({
+                "explanation": explanation,
+                "processed_image": digit_28x28.tolist(),
+            })
 
         except Exception as e:
             print("Explain Error:", e)
