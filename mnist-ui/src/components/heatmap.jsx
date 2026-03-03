@@ -84,7 +84,7 @@ function ExplainHeatmap({ canvasRef }) {
             data={[{
               z: processedImage,
               type: "heatmap",
-              colorscale: "Jet" ,
+              colorscale: "grey" ,
              interpolation: 'none',
               origin: 'upper',
               
