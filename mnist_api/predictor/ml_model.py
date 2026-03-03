@@ -78,19 +78,29 @@ def center_and_pad(img, size=28):
 
 def preprocess_canvas_image(data_url):
     """
-    Converts base64 React canvas image to 28x28 flattened array
+    Converts base64 React canvas image to:
+    - 28x28 grayscale image (for visualization)
+    - flattened (1, 784) array (for model)
     """
-   
+
+    # Decode base64
     header, encoded = data_url.split(",", 1)
     data = base64.b64decode(encoded)
-    img = Image.open(BytesIO(data)).convert("L") 
+
+    # Open image and convert to grayscale
+    img = Image.open(BytesIO(data)).convert("L")
     img = np.array(img)
 
-   
-    digit = center_and_pad(img, size=28)
+    # Center and resize to 28x28
+    digit_28x28 = center_and_pad(img, size=28)
 
-    
-    return digit.reshape(1, 784)
+    # Normalize (VERY IMPORTANT if your model expects 0-1)
+   
+    # Flatten for model
+    digit_flat = digit_28x28.reshape(1, 784)
+
+    # 🔥 Return BOTH
+    return digit_28x28, digit_flat
 
 
 learning_rate = 0.01
