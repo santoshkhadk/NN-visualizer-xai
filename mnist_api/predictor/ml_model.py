@@ -39,42 +39,43 @@ def predict_top3(X):
     return [(int(digit), float(prob)) for digit, prob in zip(top3_indices, top3_probs)]
 
 
-def center_and_pad(img, size=28):
- 
+def center_and_pad_exact(img, size=28):
+    """
+    Center the digit and pad to size x size without misalignment.
+    Preserves pixel mapping for XAI overlays.
+    """
+    
     _, img = cv2.threshold(img, 128, 255, cv2.THRESH_BINARY)
 
-  
     ys, xs = np.where(img > 0)
     if len(xs) == 0 or len(ys) == 0:
-    
         digit = img
     else:
         x_min, x_max = xs.min(), xs.max()
         y_min, y_max = ys.min(), ys.max()
         digit = img[y_min:y_max+1, x_min:x_max+1]
 
-   
     h, w = digit.shape
     scale = 20.0 / max(h, w)
-    new_w, new_h = int(w * scale), int(h * scale)
-    digit_resized = cv2.resize(digit, (new_w, new_h), interpolation=cv2.INTER_AREA)
+    new_w, new_h = int(round(w * scale)), int(round(h * scale))
 
-  
+    # Use INTER_NEAREST for exact pixel mapping
+    digit_resized = cv2.resize(digit, (new_w, new_h), interpolation=cv2.INTER_NEAREST)
+
     canvas = np.zeros((size, size), dtype=np.uint8)
     start_x = (size - new_w) // 2
     start_y = (size - new_h) // 2
     canvas[start_y:start_y+new_h, start_x:start_x+new_w] = digit_resized
 
+    # Compute exact centroid shift
     ys, xs = np.where(canvas > 0)
     if len(xs) > 0 and len(ys) > 0:
         cy, cx = ys.mean(), xs.mean()
         shiftx, shifty = int(round(size/2 - cx)), int(round(size/2 - cy))
         M = np.float32([[1, 0, shiftx], [0, 1, shifty]])
-        canvas = cv2.warpAffine(canvas, M, (size, size))
+        canvas = cv2.warpAffine(canvas, M, (size, size), flags=cv2.INTER_NEAREST)
 
-   
-    return canvas / 255.0
-
+    return canvas / 255.0  
 
 
 
