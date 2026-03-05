@@ -102,8 +102,7 @@ def preprocess_canvas_image(data_url):
     img = np.array(img)
 
     # Center and resize to 28x28
-    digit_28x28 = center_and_pad(img, size=28)
-
+    digit_28x28 = center_and_pad_exact(img)
     # Flatten for model input
     X = digit_28x28.reshape(1, 784)
 
