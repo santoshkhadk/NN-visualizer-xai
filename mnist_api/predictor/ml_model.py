@@ -291,8 +291,8 @@ def explain_with_deactivation(X, deactivate=[], top_k=3):
         top_neuron_class_contribs.append(float(neuron_contrib_values[i]))
 
     # Pixel saliency map (using original X)
-    pixel_heatmap, _, _ = saliency_map(X)
-    pixel_heatmap = (pixel_heatmap - np.min(pixel_heatmap)) / (np.max(pixel_heatmap)+1e-8)
+        pixel_heatmap, probs, _ = saliency_map(X)
+        pixel_heatmap = (pixel_heatmap - pixel_heatmap.min()) / (pixel_heatmap.max() - pixel_heatmap.min())
 
     return {
         "pixel_heatmap": pixel_heatmap,
